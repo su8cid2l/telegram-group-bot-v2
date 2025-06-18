@@ -22,7 +22,17 @@ user_message_log = {}  # (chat_id, user_id): [timestamps]
 user_warns = {}  # (chat_id, user_id): warn_count
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Hello! I'm alive and hosted on Render!")
+    await update.message.reply_text(
+        "🩸 Welcome to the Dark Side — [Bot Name] is Watching 🩸\n\n"
+        "In the twisted world between humans and ghouls, order is everything.\n"
+        "This bot is your silent enforcer — guarding the group from chaos, purging filth, and keeping peace... with precision.\n\n"
+        "⚙️ Powered by Kagune-coded logic\n"
+        "🧠 Smart. Ruthless. Unapologetically efficient.\n\n"
+        "Whether it's banning intruders, muting spammers, or delivering a masked welcome... this isn’t just a bot — it’s a shadow in the system.\n\n"
+        "👁‍🗨 Created & controlled by: [@su8cid2l]\n"
+        "🔒 Obey the rules, or face the consequences.\n\n"
+        "☕ Welcome to Anteiku’s darker backroom. Play nice — or don’t."
+    )
 
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.new_chat_members:
@@ -44,7 +54,7 @@ async def ship(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user2 = user2.user.first_name
 
     percent = random.randint(0, 100)
-    message = f❤️ Today's Ship:\n{user1} 💞 {user2} = {percent}%\n\n"
+    message = f"❤️ Today's Ship:\n{user1} 💞 {user2} = {percent}%\n\n"
     if percent > 80:
         message += "Destiny brought them together. Or maybe just this bot."
     elif percent > 50:
