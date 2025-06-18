@@ -1,41 +1,13 @@
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram import Update, ChatPermissions
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+import os
 import random
-from datetime import timedelta
+import time
 
-# 🔐 Bot Token
-TOKEN = "8008461886:AAEpxGDSebJ4rbyAcZQpvPwWmJjnN-yXAmc"
+TOKEN = os.environ.get("BOT_TOKEN")
 
-# 🎯 /start command
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Hello! I'm alive and hosted on Render!")
-
-# 🆘 /help command
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Commands:\n/start, /help, /info, /rules, /setlang\n/ban, /unban, /mute, /unmute, /warn, /tban, /purge"
-    )
-
-# ℹ️ /info command
-async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.reply_to_message:
-        user = update.message.reply_to_message.from_user
-        await update.message.reply_text(
-            f"User Info:\nName: {user.full_name}\nID: {user.id}\nUsername: @{user.username if user.username else 'N/A'}"
-        )
-    else:
-        await update.message.reply_text("Reply to a user's message to get their info.")
-
-# 📜 /rules command
-async def rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("These are the group rules. Be respectful, no spam, no hate.")
-
-# 🌍 /setlang command (placeholder)
-async def setlang(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Language settings will be available soon.")
-
-# 🎭 Random Welcome Messages
-WELCOME_MESSAGES = [
+# Random welcome messages
+welcome_messages = [
     "Welcome to the twisted world of ghouls and humans. Will you feast or be feasted upon?",
     "You’ve entered the 20th Ward. Don’t lose yourself... or your mask.",
     "Like Kaneki, you've now opened your eyes to a new world. Welcome.",
@@ -43,117 +15,199 @@ WELCOME_MESSAGES = [
     "Even ghouls need company. Welcome to the shadows."
 ]
 
-# 🎉 Welcome new members
+flood_limit = {}  # group_id: limit
+filtered_words = {}  # group_id: [words]
+locked_media = {}  # group_id: set of locked content types
+user_message_log = {}  # (chat_id, user_id): [timestamps]
+user_warns = {}  # (chat_id, user_id): warn_count
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Hello! I'm alive and hosted on Render!")
+
 async def welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    for user in update.message.new_chat_members:
-        message = random.choice(WELCOME_MESSAGES)
-        await update.message.reply_text(message)
+    if update.message.new_chat_members:
+        welcome_text = random.choice(welcome_messages)
+        await update.message.reply_text(welcome_text)
 
-# 🚫 /ban command
-async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Ship command
+async def ship(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.reply_to_message:
-        user_id = update.message.reply_to_message.from_user.id
-        await context.bot.ban_chat_member(chat_id=update.effective_chat.id, user_id=user_id)
-        await update.message.reply_text("User has been banned. 🚫")
+        user1 = update.message.from_user.first_name
+        user2 = update.message.reply_to_message.from_user.first_name
     else:
-        await update.message.reply_text("Reply to a user's message to ban them.")
+        members = await context.bot.get_chat_administrators(update.effective_chat.id)
+        if len(members) < 2:
+            await update.message.reply_text("Not enough members to ship!")
+            return
+        user1, user2 = random.sample(members, 2)
+        user1 = user1.user.first_name
+        user2 = user2.user.first_name
 
-# 🔇 /mute command
-async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.reply_to_message:
-        user_id = update.message.reply_to_message.from_user.id
-        permissions = ChatPermissions(can_send_messages=False)
-        await context.bot.restrict_chat_member(
-            chat_id=update.effective_chat.id,
-            user_id=user_id,
-            permissions=permissions
-        )
-        await update.message.reply_text("User has been muted. 🔇")
+    percent = random.randint(0, 100)
+    message = f❤️ Today's Ship:\n{user1} 💞 {user2} = {percent}%\n\n"
+    if percent > 80:
+        message += "Destiny brought them together. Or maybe just this bot."
+    elif percent > 50:
+        message += "They kinda vibe. OTP potential?"
+    elif percent > 30:
+        message += "Hmm. Some sparks... but will it last?"
     else:
-        await update.message.reply_text("Reply to a user's message to mute them.")
+        message += "Maybe just... friends. Probably."
+    await update.message.reply_text(message)
 
-# 🔈 /unmute command
-async def unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.reply_to_message:
-        user_id = update.message.reply_to_message.from_user.id
-        permissions = ChatPermissions(
-            can_send_messages=True,
-            can_send_media_messages=True,
-            can_send_other_messages=True,
-            can_add_web_page_previews=True
-        )
-        await context.bot.restrict_chat_member(
-            chat_id=update.effective_chat.id,
-            user_id=user_id,
-            permissions=permissions
-        )
-        await update.message.reply_text("User has been unmuted. 🔊")
-    else:
-        await update.message.reply_text("Reply to a user's message to unmute them.")
-
-# 🔓 /unban command
-async def unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.reply_to_message:
-        user_id = update.message.reply_to_message.from_user.id
-        await context.bot.unban_chat_member(chat_id=update.effective_chat.id, user_id=user_id)
-        await update.message.reply_text("User has been unbanned. 🔓")
-    else:
-        await update.message.reply_text("Reply to a user's message to unban them.")
-
-# ⚠️ /warn command
-warnings = {}
-
+# Warn command
 async def warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.reply_to_message:
-        user_id = update.message.reply_to_message.from_user.id
-        warnings[user_id] = warnings.get(user_id, 0) + 1
-        await update.message.reply_text(f"User warned! ⚠️ Total warnings: {warnings[user_id]}")
-    else:
-        await update.message.reply_text("Reply to a user's message to warn them.")
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Reply to the user you want to warn.")
+        return
 
-# ⏳ /tban command (temp ban in minutes)
-async def tban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.reply_to_message and context.args:
-        user_id = update.message.reply_to_message.from_user.id
+    user = update.message.reply_to_message.from_user
+    chat_id = update.effective_chat.id
+    key = (chat_id, user.id)
+    user_warns[key] = user_warns.get(key, 0) + 1
+    warns = user_warns[key]
+    await update.message.reply_text(f"⚠️ {user.first_name} has been warned. ({warns}/3)")
+    if warns >= 3:
         try:
-            minutes = int(context.args[0])
-            until_date = update.message.date + timedelta(minutes=minutes)
-            await context.bot.ban_chat_member(
-                chat_id=update.effective_chat.id,
-                user_id=user_id,
-                until_date=until_date
-            )
-            await update.message.reply_text(f"User temporarily banned for {minutes} minutes ⏳")
-        except ValueError:
-            await update.message.reply_text("Usage: /tban <minutes> (as a number)")
-    else:
-        await update.message.reply_text("Reply to a user and add minutes: /tban 10")
+            await context.bot.ban_chat_member(chat_id, user.id)
+            await update.message.reply_text(f"🚫 {user.first_name} has been kicked after 3 warnings.")
+            user_warns[key] = 0
+        except:
+            await update.message.reply_text("Couldn't kick the user. Make sure I'm admin.")
 
-# 🧹 /purge command (delete N recent messages)
-async def purge(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def resetwarns(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Reply to the user you want to reset warnings for.")
+        return
+
+    user = update.message.reply_to_message.from_user
+    key = (update.effective_chat.id, user.id)
+    user_warns[key] = 0
+    await update.message.reply_text(f"✅ Warnings for {user.first_name} have been reset.")
+
+# Ban command
+async def ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Reply to the user you want to ban.")
+        return
     try:
-        count = int(context.args[0]) if context.args else 10
-        messages = []
-        async for msg in update.effective_chat.get_history(limit=count+1):
-            messages.append(msg.message_id)
-        await context.bot.delete_messages(chat_id=update.effective_chat.id, message_ids=messages)
-    except Exception as e:
-        await update.message.reply_text(f"Error purging: {e}")
+        await context.bot.ban_chat_member(update.effective_chat.id, update.message.reply_to_message.from_user.id)
+        await update.message.reply_text("🚫 User banned successfully.")
+    except:
+        await update.message.reply_text("Failed to ban the user.")
 
-# 🚀 Main app
+# Unban command
+async def unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /unban <user_id>")
+        return
+    try:
+        user_id = int(context.args[0])
+        await context.bot.unban_chat_member(update.effective_chat.id, user_id)
+        await update.message.reply_text("✅ User unbanned successfully.")
+    except:
+        await update.message.reply_text("Failed to unban the user.")
+
+# Mute command
+async def mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.reply_to_message:
+        await update.message.reply_text("Reply to the user you want to mute.")
+        return
+    try:
+        permissions = ChatPermissions(can_send_messages=False)
+        await context.bot.restrict_chat_member(update.effective_chat.id, update.message.reply_to_message.from_user.id, permissions)
+        await update.message.reply_text("🔇 User muted successfully.")
+    except:
+        await update.message.reply_text("Failed to mute the user.")
+
+# Flood protection
+async def setflood(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /setflood <number>")
+        return
+    try:
+        limit = int(context.args[0])
+        flood_limit[update.effective_chat.id] = limit
+        await update.message.reply_text(f"Flood limit set to {limit} messages per 5 seconds.")
+    except:
+        await update.message.reply_text("Invalid number.")
+
+# Lock media
+async def lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /lock <media_type>")
+        return
+    media = context.args[0].lower()
+    locked_media.setdefault(update.effective_chat.id, set()).add(media)
+    await update.message.reply_text(f"Locked: {media}")
+
+async def unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Usage: /unlock <media_type>")
+        return
+    media = context.args[0].lower()
+    locked_media.get(update.effective_chat.id, set()).discard(media)
+    await update.message.reply_text(f"Unlocked: {media}")
+
+# Delete locked media messages
+async def monitor_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    now = time.time()
+
+    # Auto warn and kick
+    if chat_id in flood_limit:
+        key = (chat_id, user_id)
+        user_message_log.setdefault(key, []).append(now)
+        user_message_log[key] = [t for t in user_message_log[key] if now - t < 5]
+        if len(user_message_log[key]) > flood_limit[chat_id]:
+            user_warns[key] = user_warns.get(key, 0) + 1
+            warns = user_warns[key]
+            await update.message.reply_text(f"⚠️ {update.effective_user.first_name} warned for flooding. ({warns}/3)")
+            if warns >= 3:
+                try:
+                    await context.bot.ban_chat_member(chat_id, user_id)
+                    await update.message.reply_text(f"🚫 {update.effective_user.first_name} has been kicked for repeated flooding.")
+                    user_warns[key] = 0
+                except:
+                    await update.message.reply_text("Failed to kick the user. Maybe I'm not admin?")
+
+    locks = locked_media.get(chat_id, set())
+    if "photo" in locks and update.message.photo:
+        await update.message.delete()
+    elif "video" in locks and update.message.video:
+        await update.message.delete()
+    elif "sticker" in locks and update.message.sticker:
+        await update.message.delete()
+    elif "document" in locks and update.message.document:
+        await update.message.delete()
+
+# Info command
+async def info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat = update.effective_chat
+    message = f"👤 User Info:\n"
+    message += f"Name: {user.full_name}\n"
+    message += f"Username: @{user.username}\n" if user.username else "Username: None\n"
+    message += f"User ID: {user.id}\n"
+    message += f"Chat ID: {chat.id}"
+    await update.message.reply_text(message)
+
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("info", info))
-    app.add_handler(CommandHandler("rules", rules))
-    app.add_handler(CommandHandler("setlang", setlang))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+    app.add_handler(CommandHandler("ship", ship))
+    app.add_handler(CommandHandler("warn", warn))
+    app.add_handler(CommandHandler("resetwarns", resetwarns))
     app.add_handler(CommandHandler("ban", ban))
     app.add_handler(CommandHandler("unban", unban))
     app.add_handler(CommandHandler("mute", mute))
-    app.add_handler(CommandHandler("unmute", unmute))
-    app.add_handler(CommandHandler("warn", warn))
-    app.add_handler(CommandHandler("tban", tban))
-    app.add_handler(CommandHandler("purge", purge))
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome))
+    app.add_handler(CommandHandler("setflood", setflood))
+    app.add_handler(CommandHandler("lock", lock))
+    app.add_handler(CommandHandler("unlock", unlock))
+    app.add_handler(CommandHandler("info", info))
+    app.add_handler(MessageHandler(filters.ALL, monitor_media))
+
     app.run_polling()
